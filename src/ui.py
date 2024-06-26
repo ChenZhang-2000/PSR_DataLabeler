@@ -1,3 +1,4 @@
+import re
 import os
 import sys
 import time
@@ -11,11 +12,41 @@ from PyQt5.QtWidgets import QPushButton, QApplication, QVBoxLayout, QWidget, QHB
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint
 
 from .data import Data
+from .exceptions import *
 
 ORIGIN = {"border": "1px solid black", "padding": "3px", "background-color": "#FFFFFF"}
 UNMARKED = {"border": "1px solid black", "padding": "3px", "background-color": "#FFFFFF"}
 MARKED = {"border": "1px solid #C13434", "padding": "3px", "background-color": "#FFFFFF"}
 CHOSEN = {"border": "1px solid #D7E9FF", "padding": "3px", "background-color": "#D7E9FF"}
+
+
+def check_file(file_path, required_type=".csv"):
+    """
+    :param file_path:
+    :param required_type:
+    :return:
+        0: required file
+        -1: file type incorrect
+        1: file does not exist
+        2: input is not string
+        3: empty input
+    """
+    if not file_path:
+        return 3
+
+    if not isinstance(file_path, str):
+        return 2
+
+    if not Path(file_path).exists():
+        return 1
+
+    if not required_type:
+        return 0
+
+    if len(file_path) >= len(required_type) and file_path[-len(required_type):] == required_type:
+        return 0
+    else:
+        return -1
 
 
 def time_stamp(t, time_zone):
@@ -485,9 +516,9 @@ class MainWindow(QWidget):
         self.container.update()
 
 
-class DanmuFileLabel(QWidget):
+class FileLabel(QWidget):
     def __init__(self, idx, directory="", parent=None):
-        super(DanmuFileLabel, self).__init__(parent=parent)
+        super(FileLabel, self).__init__(parent=parent)
         self.parent = parent
         self.idx = idx
         self.layout = QHBoxLayout(self)
@@ -498,8 +529,6 @@ class DanmuFileLabel(QWidget):
         self.setFixedHeight(32)
 
         self.file_path = directory
-
-        self.label = QLabel(Path(directory).name, self)
 
         self.remove_button = QPushButton(self)
         self.remove_button.setIcon(QtGui.QIcon("./lib/img/delete_file.png"))
@@ -508,61 +537,77 @@ class DanmuFileLabel(QWidget):
         self.remove_button.clicked.connect(self.delete)
 
         self.layout.addWidget(self.remove_button)
-        self.layout.addWidget(self.label)
 
     def delete(self):
         self.parent.delete_label(self)
 
+    def verify(self):
+        return check_file(self.file_path)
 
-class SentenceFileLabel(QWidget):
+
+class DanmuFileLabel(FileLabel):
     def __init__(self, idx, directory="", parent=None):
-        super(SentenceFileLabel, self).__init__(parent=parent)
-        self.parent = parent
-        self.idx = idx
-        self.layout = QHBoxLayout(self)
-        self.setLayout(self.layout)
-        self.setStyleSheet(style_2_stylesheet(ORIGIN))
-        self.layout.setSpacing(0)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        self.setFixedHeight(32)
+        super(DanmuFileLabel, self).__init__(idx=idx, directory=directory, parent=parent)
 
+        self.label = QLabel(Path(directory).name, self)
+        self.layout.addWidget(self.label)
+
+
+class SentenceFileLabel(FileLabel):
+    def __init__(self, idx, directory="", parent=None):
+        super(SentenceFileLabel, self).__init__(idx=idx, directory=directory, parent=parent)
         self.is_editing = False
 
-        self.file_path = directory
         self.folder_path = ""
         self.start_time = Path(directory).name[:-4]
         self.time_zone_code = "UTC +8"
-
-        self.remove_button = QPushButton(self)
-        self.remove_button.setIcon(QtGui.QIcon("./lib/img/delete_file.png"))
-        self.remove_button.setIconSize(QtCore.QSize(32, 32))
-        self.remove_button.setFixedSize(32, 32)
-        # self.remove_button.setContentsMargins(0, 0, 0, 0)
-        self.remove_button.clicked.connect(self.delete)
 
         self.l_label = QLabel(Path(directory).name, self)
         self.r_label = QLabel("Select .wav Directory", self)
 
         self.l_label.setFixedHeight(32)
         self.r_label.setFixedHeight(32)
-        # self.l_label.setContentsMargins(0, 0, 0, 0)
-        # self.r_label.setContentsMargins(0, 0, 0, 0)
 
         self.time_input = QtWidgets.QLineEdit(self.start_time, self)
         self.time_input.editingFinished.connect(self.finish_editing)
         self.time_input.setFixedSize(150, 32)
-        # self.time_input.setContentsMargins(0, 0, 0, 0)
 
         self.time_zone = QtWidgets.QComboBox(self)
         self.init_time_zone_box()
         self.time_zone.setFixedHeight(32)
-        # self.time_zone.setContentsMargins(0, 0, 0, 0)
 
-        self.layout.addWidget(self.remove_button)
         self.layout.addWidget(self.l_label)
         self.layout.addWidget(self.r_label)
         self.layout.addWidget(self.time_input)
         self.layout.addWidget(self.time_zone)
+
+    def verify(self):
+        """
+
+        :return:
+            0, None: information correct
+            1, x: file path incorrect with error code x
+            2, x: folder path incorrect with error code x
+            3, x: start time incorrect with error code x
+                x=1: start time does not satisfy requirement
+            4, x: time zone incorrect with error code x
+                x=1: time zone code does not satisfy requirement
+        """
+        fp_status = check_file(self.file_path)
+        if fp_status != 0:
+            return 1, fp_status
+
+        fp_status = check_file(self.folder_path, required_type="")
+        if fp_status != 0:
+            return 2, fp_status
+
+        if not re.match(r"\d{8}-\d{6}", self.start_time):
+            return 3, 1
+
+        if not re.match(r"UTC [+-]\d{1,2}", self.time_zone_code):
+            return 4, 1
+
+        return 0, None
 
     def start_editing(self):
         self.time_input.setText(self.label.text())
@@ -592,9 +637,6 @@ class SentenceFileLabel(QWidget):
         file_folder = self.parent.select_folder()
         self.r_label.setText(Path(file_folder).name)
         self.folder_path = file_folder
-
-    def delete(self):
-        self.parent.delete_label(self)
 
     def current_text_changed(self, s):
         self.time_zone = s
@@ -690,8 +732,43 @@ class PreMainWidget(QWidget):
         for i in range(len(labels)):
             labels[i].idx = i
 
+    def check_err_code(self, err_code, idx, subject="Danmu file"):
+        if err_code == 0:
+            pass
+        elif err_code == -1:
+            raise FileNotCSVException(f"{subject} {idx} has incorrect file type")
+        elif err_code == 1:
+            raise FileDoesNotExist(f"{subject} {idx} does not exist")
+        elif err_code == 2:
+            raise InputNotString(f"{subject} {idx} has wrong input type")
+        elif err_code == 3:
+            raise EmptyInput(f"{subject} {idx} is empty")
+        else:
+            raise Exception(f"{subject} {idx} has unknown exception")
+
     def verify(self):
-        return
+        for label in self.danmu_labels:
+            err_code = label.verify()
+            self.check_err_code(err_code, label.idx, "Danmu file")
+
+        for label in self.sentence_labels:
+            error_term, err_code = label.verify()
+            if error_term == 0:
+                continue
+            elif error_term == 1:
+                self.check_err_code(err_code, label.idx, "Sentence file")
+            elif error_term == 2:
+                self.check_err_code(err_code, label.idx, "Folder")
+            elif error_term == 3:
+                if err_code == 1:
+                    raise StartTimeFormatIncorrect(f"Start time {label.start_time} has incorrect format")
+                else:
+                    raise Exception(f"Start time {label.start_time} has unknown exception")
+            elif error_term == 4:
+                if err_code == 1:
+                    raise StartTimeFormatIncorrect(f"Time zone {label.time_zone_code} has incorrect format")
+                else:
+                    raise Exception(f"Time zone {label.time_zone_code} has unknown exception")
 
     def launch(self):
         try:
@@ -714,7 +791,7 @@ class PreMainWidget(QWidget):
             mw.show()
             self.hide()
 
-        except Exception as err:
+        except FileLabelException as err:
             print(err)
 
 
