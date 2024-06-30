@@ -60,6 +60,7 @@ class Data:
         # fan_level: the level of fans
         # username: the username of the sender
         # content: the content of the danmu
+        self.parent = None
 
     def __getitem__(self, item):
         return self.dialogue[item]
@@ -113,10 +114,9 @@ class Data:
             out = self.danmu.undo()
         else:
             action, idx = action
-            if action == "delete":
-                self.dialogue[idx[0], idx[1]] = 1
-            elif action == "match":
-                self.dialogue[idx[0], idx[1]] = 0
+            if action == "delete" or action == "match":
+                self.parent.match.match(idx[0], idx[1])
+                self.history.pop(-1)
             else:
                 raise
             out = None

@@ -131,22 +131,21 @@ class Matching:
             self.data.delete("dialogue", (l_idx, r_idx))
             if self.window.dialogue_show:
                 if (self.data.dialogue[l_idx, :] != 0).count_nonzero() == 0:
-                    self.left.set_unchosen()
+                    self.window.sen_labels[l_idx][0].set_unchosen()
                 else:
-                    self.left.set_chosen()
+                    self.window.sen_labels[l_idx][0].set_chosen()
                 if (self.data.dialogue[:, r_idx] != 0).count_nonzero() == 0:
-                    self.right.set_unchosen()
+                    self.window.dan_labels[r_idx][0].set_unchosen()
                 else:
-                    self.right.set_chosen()
+                    self.window.dan_labels[r_idx][0].set_chosen()
             out = 0
         else:
             self.data.match(l_idx, r_idx)
             if self.window.dialogue_show:
-                self.left.set_chosen()
-                self.right.set_chosen()
+                self.window.sen_labels[l_idx][0].set_chosen()
+                self.window.dan_labels[r_idx][0].set_chosen()
             out = 1
         return out
-        # print(self.data.dialogue)
 
 
 class Label(QWidget):
@@ -341,6 +340,7 @@ class MainWindow(QWidget):
         super(MainWindow, self).__init__()
         self.parent = parent
         self.data = data
+        self.data.parent = self
         self.data.danmu.shift(danmu_shift)
         self.data.mk_timeline()
 
@@ -447,6 +447,7 @@ class MainWindow(QWidget):
                 self.sen_labels[i][0].set_chosen()
                 self.dan_labels[j][0].set_chosen()
         self.dialogue_show = not self.dialogue_show
+        self.update()
 
     def delete(self, label):
         self.container_layout.removeWidget(label)
@@ -558,12 +559,19 @@ class SentenceFileLabel(FileLabel):
         super(SentenceFileLabel, self).__init__(idx=idx, directory=directory, parent=parent)
         self.is_editing = False
 
+        path = Path(directory)
         self.folder_path = ""
-        self.start_time = Path(directory).name[:-4]
+        self.start_time = path.stem
         self.time_zone_code = "UTC +8"
 
-        self.l_label = QLabel(Path(directory).name, self)
-        self.r_label = QLabel("Select .wav Directory", self)
+        self.l_label = QLabel(path.name, self)
+
+        fp = path.parent / path.stem
+        if fp.exists():
+            self.r_label = QLabel(path.stem, self)
+            self.folder_path = fp.__str__()
+        else:
+            self.r_label = QLabel("Select .wav Directory", self)
 
         self.l_label.setFixedHeight(32)
         self.r_label.setFixedHeight(32)
