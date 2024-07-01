@@ -698,7 +698,7 @@ class PreMainWidget(QWidget):
 
     def select_file(self):
         options = QtWidgets.QFileDialog.Options()
-        file_name, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Select File", "", "CSV Files (*.csv);;All Files (*)", options=options)
+        file_name, _ = QtWidgets.QFileDialog.getOpenFileNames(self, "Select File", "", "CSV Files (*.csv);;All Files (*)", options=options)
         return file_name
 
     def select_folder(self):
@@ -707,20 +707,22 @@ class PreMainWidget(QWidget):
         return folder_name
 
     def select_sentence_file(self):
-        file_name = self.select_file()
-        if file_name:
-            idx = self.sentence_labels.__len__()
-            label = SentenceFileLabel(idx, file_name, self)
-            self.sentence_labels.append(label)
-            self.sentence_box_layout.addWidget(label)
+        file_names = self.select_file()
+        if file_names:
+            for file_name in file_names:
+                idx = self.sentence_labels.__len__()
+                label = SentenceFileLabel(idx, file_name, self)
+                self.sentence_labels.append(label)
+                self.sentence_box_layout.addWidget(label)
 
     def select_danmu_file(self):
-        file_name = self.select_file()
-        if file_name:
-            idx = self.danmu_labels.__len__()
-            label = DanmuFileLabel(idx, file_name, self)
-            self.danmu_labels.append(label)
-            self.danmu_box_layout.addWidget(label)
+        file_names = self.select_file()
+        if file_names:
+            for file_name in file_names:
+                idx = self.danmu_labels.__len__()
+                label = DanmuFileLabel(idx, file_name, self)
+                self.danmu_labels.append(label)
+                self.danmu_box_layout.addWidget(label)
 
     def delete_label(self, label):
         if isinstance(label, SentenceFileLabel):
