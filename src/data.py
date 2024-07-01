@@ -34,7 +34,9 @@ class Data:
         for sen_dir, sen_txt_file, t in sen_dirs[1:]:
             self.sentences.append(Sentences(sen_dir, sen_txt_file), t)
 
-        self.sentences.data.sort_values("start", inplace=True)
+        self.sentences.data.insert(0, "index", self.sentences.data.index, True)
+        self.sentences.data.sort_values(["start", "index"], inplace=True)
+        self.sentences.data.drop(columns="index", inplace=True)
         self.sentences.data.reset_index(drop=True, inplace=True)
 
         if isinstance(danmu_file, str):
@@ -48,7 +50,9 @@ class Data:
         else:
             raise
 
-        self.danmu.data.sort_values("time", inplace=True)
+        self.danmu.data.insert(0, "index", self.danmu.data.index, True)
+        self.danmu.data.sort_values(["time", "index"], inplace=True)
+        self.danmu.data.drop(columns="index", inplace=True)
         self.danmu.data.reset_index(drop=True, inplace=True)
 
         self.mk_timeline()
